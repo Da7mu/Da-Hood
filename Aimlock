@@ -1,0 +1,284 @@
+local configs = {
+    main = {
+        enabled = true,
+        aimlockkey = "q",
+        prediction = 0.15634,
+        aimpart = 'HumanoidRootPart',
+        notifications = true
+    }
+}
+
+
+local boxsettings = {
+    box = {
+        Showbox = true,
+
+        boxsize = Vector3.new(3.3, 3, 2.8), -- Box Size
+        markercolor = Color3.fromRGB(255, 255, 255),
+        markersize = UDim2.new(1, 0, 1, 0)
+    }
+}
+
+local box = Instance.new("Part", game.Workspace)
+box.Material = Enum.Material.ForceField
+box.Color = Color3.fromRGB(199, 110, 255)
+
+local Mouse = game.Players.LocalPlayer:GetMouse()
+
+function makemarker(Parent, Adornee, Color, Size, Size2)
+    local box = Instance.new("BillboardGui", Parent)
+    box.Name = "Skidded"
+    box.Adornee = Adornee
+    box.Size = UDim2.new(Size, Size2, Size, Size2)
+    box.AlwaysOnTop = true
+    local a = Instance.new("Frame", box)
+    a.Size = boxsettings.box.markersize
+    a.BackgroundColor3 = Color
+
+    local g = Instance.new("UICorner", a)
+    g.CornerRadius = UDim.new(50, 50)
+    return (box)
+end
+
+local Plr
+
+local highlight = Instance.new("Highlight")
+highlight.FillColor = Color3.fromRGB(199, 110, 255)
+highlight.Parent = game.CoreGui
+highlight.OutlineTransparency = 0
+highlight.OutlineColor = Color3.new(1, 1, 1)
+highlight.FillTransparency = 0.5
+
+local line = Drawing.new("Line")
+line.Visible = true
+line.Color = Color3.fromRGB(199, 110, 255)
+line.Thickness = 2
+line.Transparency = 1
+
+getgenv().crosshair = {
+    enabled = true,
+    refreshrate = 0,
+    mode = 'mouse',
+    position = Vector2.new(0,0),
+
+    width = 1.5,
+    length = 10,
+    radius = 11,
+    color = Color3.fromRGB(199, 110, 255),
+
+    spin = true,
+    spin_speed = 150,
+    spin_max = 340,
+    spin_style = Enum.EasingStyle.Sine,
+
+    resize = true,
+    resize_speed = 150,
+    resize_min = 5,
+    resize_max = 22,
+}
+
+local old; old = hookfunction(Drawing.new, function(class, properties)
+    local drawing = old(class)
+    for i,v in next, properties or {} do
+        drawing[i] = v
+    end
+    return drawing
+end)
+
+local runservice = game:GetService('RunService')
+local inputservice = game:GetService('UserInputService')
+local tweenservice = game:GetService('TweenService')
+local camera = workspace.CurrentCamera
+
+local last_render = 0
+
+local drawings = {
+    crosshair = {},
+    text = {Drawing.new('Text', {Size = 13, Font = 2, Outline = true, Text = 'tapbot', Color = Color3.new(1,1,1)}),
+            Drawing.new('Text', {Size = 13, Font = 2, Outline = true, Text = ".cc"}),},
+}
+
+for idx = 1, 8 do
+    drawings.crosshair[idx] = Drawing.new('Line')
+end
+
+function solve(angle, radius)
+    return Vector2.new(
+        math.sin(math.rad(angle)) * radius,
+        math.cos(math.rad(angle)) * radius
+    )
+end
+
+runservice.PostSimulation:Connect(function()
+
+    local _tick = tick()
+
+    if _tick - last_render > crosshair.refreshrate then
+        last_render = _tick
+
+        local position = (
+            crosshair.mode == 'center' and camera.ViewportSize / 2 or
+            crosshair.mode == 'mouse' and inputservice:GetMouseLocation() or
+            crosshair.position
+        )
+
+        local text_x = drawings.text[1].TextBounds.X + drawings.text[2].TextBounds.X
+
+        drawings.text[1].Visible = crosshair.enabled
+        drawings.text[2].Visible = crosshair.enabled
+
+        if crosshair.enabled then
+            drawings.text[1].Position = position + Vector2.new(-text_x / 2, crosshair.radius + (crosshair.resize and crosshair.resize_max or crosshair.length) + 15)
+            drawings.text[2].Position = drawings.text[1].Position + Vector2.new(drawings.text[1].TextBounds.X)
+            drawings.text[2].Color = crosshair.color
+            
+            for idx = 1, 4 do
+                local outline = drawings.crosshair[idx]
+                local inline = drawings.crosshair[idx + 4]
+    
+                local angle = (idx - 1) * 90
+                local length = crosshair.length
+    
+                if crosshair.spin then
+                    local spin_angle = -_tick * crosshair.spin_speed % crosshair.spin_max
+                    angle = angle + tweenservice:GetValue(spin_angle / 360, crosshair.spin_style, Enum.EasingDirection.InOut) * 360
+                end
+    
+                if crosshair.resize then
+                    local resize_length = tick() * crosshair.resize_speed % 180
+                    length = crosshair.resize_min + math.sin(math.rad(resize_length)) * crosshair.resize_max
+                end
+    
+                inline.Visible = true
+                inline.Color = crosshair.color
+                inline.From = position + solve(angle, crosshair.radius)
+                inline.To = position + solve(angle, crosshair.radius + length)
+                inline.Thickness = crosshair.width
+    
+                outline.Visible = true
+                outline.From = position + solve(angle, crosshair.radius - 1)
+                outline.To = position + solve(angle, crosshair.radius + length + 1)
+                outline.Thickness = crosshair.width + 1.5    
+            end
+        else
+            for idx = 1, 8 do
+                drawings.crosshair[idx].Visible = false
+            end
+        end
+
+    end
+end)
+
+Mouse.KeyDown:Connect(function(KeyPressed)
+    if KeyPressed == (configs.main.aimlockkey) then
+        if configs.main.enabled == true then
+            configs.main.enabled = false
+            if configs.main.notifications == true then
+                Plr = FindClosestUser()
+                game.StarterGui:SetCore("SendNotification", {
+                    Title = "tapbot.cc",
+                    Text = "Unlocked"
+                })
+            end
+            highlight.Adornee = game.CoreGui
+        else
+            Plr = FindClosestUser()
+            configs.main.enabled = true
+            if configs.main.notifications == true then
+                game.StarterGui:SetCore("SendNotification", {
+                    Title = "tapbot.cc",
+                    Text = "Target: " .. tostring(Plr.Character.Humanoid.DisplayName)
+                })
+            end
+            highlight.Adornee = Plr.Character
+        end
+    end
+end)
+
+local data = game.Players:GetPlayers()
+function noob(player)
+    local character
+    repeat
+        wait()
+    until player.Character
+    local handler = makemarker(guimain, player.Character:WaitForChild(configs.main.aimpart),
+        Color3.fromRGB(107, 184, 255), 0.10, 8)
+    handler.Name = player.Name
+    player.CharacterAdded:connect(function(Char)
+        handler.Adornee = Char:WaitForChild("HumanoidRootPart")
+    end)
+end
+
+for i = 1, #data do
+    if data[i] ~= game.Players.LocalPlayer then
+        noob(data[i])
+    end
+end
+
+game.Players.PlayerAdded:connect(function(Player)
+    noob(Player)
+end)
+
+spawn(function()
+    box.Anchored = true
+    box.CanCollide = false
+    box.Size = boxsettings.box.boxsize
+    if boxsettings.box.Showbox == true then
+        box.Transparency = 0.80
+    else
+        box.Transparency = 1
+    end
+    makemarker(box, box, boxsettings.box.markercolor, 0.40, 1)
+end)
+
+function FindClosestUser()
+    local closestPlayer
+    local ShortestDistance = 300
+
+    for i, v in pairs(game.Players:GetPlayers()) do
+        if v ~= game.Players.LocalPlayer and v.Character and v.Character:FindFirstChild("Humanoid") and
+            v.Character.Humanoid.Health ~= 0 and v.Character:FindFirstChild("HumanoidRootPart") then
+            local pos = game:GetService "Workspace".CurrentCamera:WorldToViewportPoint(v.Character.PrimaryPart.Position)
+            local magnitude = (Vector2.new(pos.X, pos.Y) -
+                                  Vector2.new(game.Players.LocalPlayer:GetMouse().X,
+                    game.Players.LocalPlayer:GetMouse().Y)).magnitude
+            if magnitude < ShortestDistance then
+                closestPlayer = v
+                ShortestDistance = magnitude
+            end
+        end
+    end
+    return closestPlayer
+end
+
+game:GetService "RunService".Stepped:connect(function()
+    if configs.main.enabled and Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart") then
+        box.CFrame = CFrame.new(Plr.Character[configs.main.aimpart].Position +
+                                    (Plr.Character.UpperTorso.Velocity * configs.main.prediction))
+        local Vector1 = camera:WorldToViewportPoint(Plr.Character.HumanoidRootPart.Position)
+        line.Visible = true
+        line.From = Vector2.new(Vector1.X, Vector1.Y)
+        line.To = inputservice:GetMouseLocation()
+    else
+        box.CFrame = CFrame.new(0, 9999, 0)
+        line.Visible = false
+        line.From = Vector2.new(0,0)
+        line.To = Vector2.new(0,0)
+    end
+end)
+
+repeat
+    wait()
+until game:IsLoaded()
+local mt = getrawmetatable(game)
+local old = mt.__namecall
+setreadonly(mt, false)
+mt.__namecall = newcclosure(function(...)
+    local args = {...}
+    if configs.main.enabled and getnamecallmethod() == "FireServer" and args[2] == "UpdateMousePos" then
+        args[3] = Plr.Character[configs.main.aimpart].Position +
+                      (Plr.Character[configs.main.aimpart].Velocity * configs.main.prediction)
+        return old(unpack(args))
+    end
+    return old(...)
+end)
