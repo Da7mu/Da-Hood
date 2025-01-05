@@ -1,0 +1,10 @@
+- LocalScript to kick the player
+
+local player = game.Players.LocalPlayer
+
+-- You can use this method to kick the player immediately
+player:Kick("You have been PERMANENTLY Banned!")
+
+-- Or, you can add a delay before kicking
+-- wait(5)  -- Delay for 5 seconds before kicking
+-- player:Kick("You have been PERMANENTLY Banned!")
